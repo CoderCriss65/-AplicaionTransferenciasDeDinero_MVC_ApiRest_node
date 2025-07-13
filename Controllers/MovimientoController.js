@@ -56,76 +56,82 @@ const realizarOperacion = async (tipo, req, res) => {
 
 // Transferir dinero entre cuentas
 exports.transferir = async (req, res) => {
-  const { cuenta_origen, cuenta_destino, monto, descripcion = 'Transferencia' } = req.body;
+    const { cuenta_origen, cuenta_destino, monto, descripcion = 'Transferencia' } = req.body;
+    const montoNum = parseFloat(monto);
+    console.log(montoNum);
+    
+    if (isNaN(montoNum) || montoNum <= 0) {
+      return res.status(400).json({ error: "Monto inválido" });
+    }
   
-  const connection = await pool.getConnection();
+    const connection = await pool.getConnection();
+    
+    try {
+      await connection.beginTransaction();
   
-  try {
-    await connection.beginTransaction();
-
-    // Obtener cuentas
-    const cuentaOrigen = await CuentaModel.obtenerPorId(cuenta_origen);
-    const cuentaDestino = await CuentaModel.obtenerPorId(cuenta_destino);
-    
-    if (!cuentaOrigen) throw new Error('Cuenta origen no encontrada');
-    if (!cuentaDestino) throw new Error('Cuenta destino no encontrada');
-    
-    const saldo_origen_anterior = parseFloat(cuentaOrigen.saldo);
-    const saldo_destino_anterior = parseFloat(cuentaDestino.saldo);
-    
-    if (saldo_origen_anterior < parseFloat(monto)) throw new Error('Saldo insuficiente');
-
-    const saldo_origen_posterior = saldo_origen_anterior - parseFloat(monto);
-    const saldo_destino_posterior = saldo_destino_anterior + parseFloat(monto);
-
-    // Actualizar saldos
-    await CuentaModel.actualizarSaldo(cuenta_origen, saldo_origen_posterior, connection);
-    await CuentaModel.actualizarSaldo(cuenta_destino, saldo_destino_posterior, connection);
-
-    // Registrar movimientos para ambas cuentas
-    await MovimientoModel.registrar({
-      tipo: 'transferencia',
-      cuenta_id: cuenta_origen,
-      monto: -monto,
-      saldo_anterior: saldo_origen_anterior,
-      saldo_posterior: saldo_origen_posterior,
-      descripcion: `${descripcion} a cuenta ${cuenta_destino}`,
-      cuenta_origen_id: cuenta_origen,
-      cuenta_destino_id: cuenta_destino,
-      connection
-    });
-    
-    await MovimientoModel.registrar({
-      tipo: 'transferencia',
-      cuenta_id: cuenta_destino,
-      monto: monto,
-      saldo_anterior: saldo_destino_anterior,
-      saldo_posterior: saldo_destino_posterior,
-      descripcion: `${descripcion} de cuenta ${cuenta_origen}`,
-      cuenta_origen_id: cuenta_origen,
-      cuenta_destino_id: cuenta_destino,
-      connection
-    });
-
-    await connection.commit();
-    res.json({ 
-      mensaje: 'Transferencia exitosa',
-      cuenta_origen: {
+      // Obtener cuentas
+      const cuentaOrigen = await CuentaModel.obtenerPorId(cuenta_origen);
+      const cuentaDestino = await CuentaModel.obtenerPorId(cuenta_destino);
+      
+      if (!cuentaOrigen) throw new Error('Cuenta origen no encontrada');
+      if (!cuentaDestino) throw new Error('Cuenta destino no encontrada');
+      
+      const saldo_origen_anterior = parseFloat(cuentaOrigen.saldo);
+      const saldo_destino_anterior = parseFloat(cuentaDestino.saldo);
+      
+      if (saldo_origen_anterior < montoNum) throw new Error('Saldo insuficiente');
+  
+      const saldo_origen_posterior = saldo_origen_anterior - montoNum;
+      const saldo_destino_posterior = saldo_destino_anterior + montoNum;
+  
+      // Actualizar saldos
+      await CuentaModel.actualizarSaldo(cuenta_origen, saldo_origen_posterior, connection);
+      await CuentaModel.actualizarSaldo(cuenta_destino, saldo_destino_posterior, connection);
+  
+      // Registrar movimientos
+      await MovimientoModel.registrar({
+        tipo: 'transferencia',
+        cuenta_id: cuenta_origen,
+        monto: -montoNum,  // Usar valor numérico
         saldo_anterior: saldo_origen_anterior,
-        saldo_posterior: saldo_origen_posterior
-      },
-      cuenta_destino: {
+        saldo_posterior: saldo_origen_posterior,
+        descripcion: `${descripcion} a cuenta ${cuenta_destino}`,
+        cuenta_origen_id: cuenta_origen,
+        cuenta_destino_id: cuenta_destino,
+        connection
+      });
+      
+      await MovimientoModel.registrar({
+        tipo: 'transferencia',
+        cuenta_id: cuenta_destino,
+        monto: montoNum,  // Usar valor numérico
         saldo_anterior: saldo_destino_anterior,
-        saldo_posterior: saldo_destino_posterior
-      }
-    });
-  } catch (err) {
-    await connection.rollback();
-    res.status(400).json({ error: err.message });
-  } finally {
-    connection.release();
-  }
-};
+        saldo_posterior: saldo_destino_posterior,
+        descripcion: `${descripcion} de cuenta ${cuenta_origen}`,
+        cuenta_origen_id: cuenta_origen,
+        cuenta_destino_id: cuenta_destino,
+        connection
+      });
+  
+      await connection.commit();
+      res.json({ 
+        mensaje: 'Transferencia exitosa',
+        cuenta_origen: {
+          saldo_anterior: saldo_origen_anterior,
+          saldo_posterior: saldo_origen_posterior
+        },
+        cuenta_destino: {
+          saldo_anterior: saldo_destino_anterior,
+          saldo_posterior: saldo_destino_posterior
+        }
+      });
+    } catch (err) {
+      await connection.rollback();
+      res.status(400).json({ error: err.message });
+    } finally {
+      connection.release();
+    }
+  };
 
 exports.depositar = (req, res) => realizarOperacion('deposito', req, res);
 exports.retirar = (req, res) => realizarOperacion('retiro', req, res);
