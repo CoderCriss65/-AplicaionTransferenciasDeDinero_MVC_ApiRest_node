@@ -1,5 +1,7 @@
-CREATE DATABASE IF NOT EXISTS banco_Aplicacion;
-USE banco_Aplicacion;
+--CREATE DATABASE IF NOT EXISTS banco_Aplicacion;
+---USE banco_Aplicacion;
+
+USE b3jxqe5g7phe0cpxue8r;
 
 -- Tabla Clientes
 CREATE TABLE clientes (
