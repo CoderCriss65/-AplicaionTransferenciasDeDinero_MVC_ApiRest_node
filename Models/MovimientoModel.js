@@ -14,9 +14,9 @@ class MovimientoModel {
   }) {
     await connection.execute(
       `INSERT INTO movimientos 
-        (tipo, cuenta_id, monto, saldo_anterior, saldo_actual, cuenta_origen_id, cuenta_destino_id,descripcion) 
+        (cuenta_id,tipo, monto, saldo_anterior, saldo_actual, cuenta_origen_id, cuenta_destino_id,descripcion) 
        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [tipo, cuenta_id, monto, saldo_anterior, saldo_actual, cuenta_origen_id, cuenta_destino_id,descripcion]
+      [ cuenta_id,tipo, monto, saldo_anterior, saldo_actual, cuenta_origen_id, cuenta_destino_id,descripcion]
     );
   }
 
